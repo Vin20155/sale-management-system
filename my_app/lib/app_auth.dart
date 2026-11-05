@@ -1,16 +1,22 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:my_app/screens/login_screen.dart';
 import 'package:my_app/screens/main_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:my_app/services/mart_service.dart';
 
-class AppAuth extends StatelessWidget {
+class AppAuth extends StatefulWidget {
   const AppAuth({super.key});
 
   @override
+  State<AppAuth> createState() => _AppAuthState();
+}
+
+class _AppAuthState extends State<AppAuth> {
+  late final Future<bool> _session = MartService().restoreSession();
+
+  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<SharedPreferences>(
-      future: SharedPreferences.getInstance(),
+    return FutureBuilder<bool>(
+      future: _session,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -18,24 +24,9 @@ class AppAuth extends StatelessWidget {
           );
         }
 
-        final sp = snapshot.data;
-        final hasSavedLogin = sp != null && sp.getString("EMAIL") != null && sp.getString("EMAIL")!.isNotEmpty;
-
-        return StreamBuilder<User?>(
-          stream: FirebaseAuth.instance.authStateChanges(),
-          builder: (context, data) {
-            if (data.connectionState == ConnectionState.waiting && !hasSavedLogin) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (data.hasData || hasSavedLogin) {
-              return const MainScreen();
-            } else {
-              return const LoginScreen();
-            }
-          },
-        );
+        return snapshot.data == true
+            ? const MainScreen()
+            : const LoginScreen();
       },
     );
   }

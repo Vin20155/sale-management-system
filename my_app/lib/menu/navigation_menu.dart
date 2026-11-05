@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:my_app/config/app_colors.dart';
@@ -15,6 +14,7 @@ import 'package:my_app/screens/cards/stock_screen.dart';
 import 'package:my_app/screens/cards/user_management_screen.dart';
 import 'package:my_app/screens/login_screen.dart';
 import 'package:my_app/screens/main_screen.dart';
+import 'package:my_app/models/mart_models.dart';
 import 'package:my_app/services/mart_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -50,24 +50,19 @@ class _NavigationMenuState extends State<NavigationMenu> {
 
   Future<void> _loadData() async {
     final sp = await SharedPreferences.getInstance();
-    setState(() {
-      _role = sp.getString("ROLE") ?? 'cashier';
-      if (_role == 'admin') {
-        fullname = sp.getString("FULLNAME") ?? 'Ngam Vin (Admin)';
-        email = sp.getString("EMAIL") ?? 'admin@gmail.com';
-      } else if (_role == 'stock_controller') {
-        fullname = sp.getString("FULLNAME") ?? 'Vin (Stock Controller)';
-        email = sp.getString("EMAIL") ?? 'stock@gmail.com';
-      } else {
-        fullname = sp.getString("FULLNAME") ?? 'អ្នកគិតលុយ (Cashier)';
-        email = sp.getString("EMAIL") ?? 'cashier@gmail.com';
-      }
-    });
+    await _martService.init();
+
+    if (mounted) {
+      setState(() {
+        _role = sp.getString("ROLE") ?? 'cashier';
+        fullname = sp.getString("FULLNAME");
+        email = sp.getString("EMAIL");
+      });
+    }
   }
 
   Future<void> _promptPasswordAndSwitchRole({
     required String targetRole,
-    required String targetFullName,
     required String targetEmail,
     required String targetLabelKh,
     required Color roleColor,
@@ -78,6 +73,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
       return;
     }
 
+    final txtSwitchUsername = TextEditingController(text: targetEmail);
     final txtSwitchPassword = TextEditingController();
     bool isObscured = true;
     String? errorMessage;
@@ -87,12 +83,13 @@ class _NavigationMenuState extends State<NavigationMenu> {
       barrierDismissible: false,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: roleColor.withOpacity(0.15),
+                backgroundColor: roleColor.withValues(alpha: 0.15),
                 child: Icon(roleIcon, color: roleColor, size: 20),
               ),
               const SizedBox(width: 10),
@@ -109,21 +106,33 @@ class _NavigationMenuState extends State<NavigationMenu> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'សូមបញ្ចូលពាក្យសម្ងាត់ដើម្បីប្តូរទៅកាន់៖\n$targetLabelKh ($targetEmail)',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                'សូមបញ្ចូលឈ្មោះគណនី ឬអ៊ីមែល និងពាក្យសម្ងាត់ដើម្បីប្តូរទៅកាន់៖\n$targetLabelKh',
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 16),
               TextField(
+                controller: txtSwitchUsername,
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Username / Email (ឈ្មោះគណនី / អ៊ីមែល)',
+                  prefixIcon: Icon(Icons.person_outline),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
                 controller: txtSwitchPassword,
                 obscureText: isObscured,
-                autofocus: true,
                 decoration: InputDecoration(
                   labelText: 'Password (ពាក្យសម្ងាត់)',
-                  hintText: '123456',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      isObscured ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                      isObscured
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
                       size: 20,
                     ),
                     onPressed: () {
@@ -137,11 +146,12 @@ class _NavigationMenuState extends State<NavigationMenu> {
                 ),
                 onSubmitted: (_) {
                   final entered = txtSwitchPassword.text.trim();
-                  if (entered == '123456' || entered == 'password' || entered.length >= 6) {
+                  if (txtSwitchUsername.text.trim().isNotEmpty &&
+                      entered.isNotEmpty) {
                     Navigator.pop(dialogCtx, true);
                   } else {
                     setDialogState(() {
-                      errorMessage = 'ពាក្យសម្ងាត់មិនត្រឹមត្រូវ! (Default: 123456)';
+                      errorMessage = 'សូមបញ្ចូលឈ្មោះគណនី និងពាក្យសម្ងាត់';
                     });
                   }
                 },
@@ -157,15 +167,17 @@ class _NavigationMenuState extends State<NavigationMenu> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: roleColor,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
                 final entered = txtSwitchPassword.text.trim();
-                if (entered == '123456' || entered == 'password' || entered.length >= 6) {
+                if (txtSwitchUsername.text.trim().isNotEmpty &&
+                    entered.isNotEmpty) {
                   Navigator.pop(dialogCtx, true);
                 } else {
                   setDialogState(() {
-                    errorMessage = 'ពាក្យសម្ងាត់មិនត្រឹមត្រូវ! (Default: 123456)';
+                    errorMessage = 'សូមបញ្ចូលឈ្មោះគណនី និងពាក្យសម្ងាត់';
                   });
                 }
               },
@@ -177,18 +189,29 @@ class _NavigationMenuState extends State<NavigationMenu> {
     );
 
     if (confirmed == true) {
-      final sp = await SharedPreferences.getInstance();
-      await sp.setString("ROLE", targetRole);
-      await sp.setString("FULLNAME", targetFullName);
-      await sp.setString("EMAIL", targetEmail);
-      await sp.setString("UID", "${targetRole}_uid");
-      EasyLoading.showSuccess('បានប្តូរទៅកាន់ $targetLabelKh');
+      final username = txtSwitchUsername.text;
+      final password = txtSwitchPassword.text;
+      txtSwitchUsername.dispose();
+      txtSwitchPassword.dispose();
+      final error = await _martService.authenticate(
+        username: username,
+        password: password,
+        requiredRole: targetRole,
+      );
+      if (error != null) {
+        EasyLoading.showError(error);
+        return;
+      }
+      EasyLoading.showSuccess('បានចូលគណនី $targetLabelKh');
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const MainScreen()),
         (route) => false,
       );
+    } else {
+      txtSwitchUsername.dispose();
+      txtSwitchPassword.dispose();
     }
   }
 
@@ -220,7 +243,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'សូមជ្រើសរើសតួនាទី និងបញ្ចូលពាក្យសម្ងាត់ដើម្បីផ្ទៀងផ្ទាត់៖',
+                'សូមជ្រើសរើសតួនាទី ហើយបញ្ចូលឈ្មោះគណនី និងពាក្យសម្ងាត់៖',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 14),
@@ -228,26 +251,36 @@ class _NavigationMenuState extends State<NavigationMenu> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(
-                    color: _role == 'cashier' ? AppColors.primary : Colors.transparent,
+                    color: _role == 'cashier'
+                        ? AppColors.primary
+                        : Colors.transparent,
                     width: 1.5,
                   ),
                 ),
                 tileColor: _role == 'cashier'
-                    ? AppColors.primary.withOpacity(0.08)
-                    : Colors.grey.withOpacity(0.06),
+                    ? AppColors.primary.withValues(alpha: 0.08)
+                    : Colors.grey.withValues(alpha: 0.06),
                 leading: const CircleAvatar(
                   backgroundColor: AppColors.primary,
                   child: Icon(Icons.point_of_sale, color: Colors.white),
                 ),
-                title: const Text('បេឡាករ (Cashier)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('cashier@gmail.com • គិតប្រាក់ POS, KHQR, បើក/បិទវេន', style: TextStyle(fontSize: 11)),
-                trailing: _role == 'cashier' ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
+                title: const Text('បេឡាករ (Cashier)',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('គិតប្រាក់ POS, KHQR, បើក/បិទវេន',
+                    style: TextStyle(fontSize: 11)),
+                trailing: _role == 'cashier'
+                    ? const Icon(Icons.check_circle, color: AppColors.primary)
+                    : null,
                 onTap: () {
                   Navigator.pop(bottomSheetCtx);
+                  final matched =
+                      _martService.users.cast<UserModel?>().firstWhere(
+                            (u) => u?.role == 'cashier',
+                            orElse: () => null,
+                          );
                   _promptPasswordAndSwitchRole(
                     targetRole: 'cashier',
-                    targetFullName: 'អ្នកគិតលុយ (Cashier)',
-                    targetEmail: 'cashier@gmail.com',
+                    targetEmail: matched?.email ?? '',
                     targetLabelKh: 'បេឡាករ (Cashier)',
                     roleColor: AppColors.primary,
                     roleIcon: Icons.point_of_sale,
@@ -259,26 +292,36 @@ class _NavigationMenuState extends State<NavigationMenu> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(
-                    color: _role == 'stock_controller' ? AppColors.secondary : Colors.transparent,
+                    color: _role == 'stock_controller'
+                        ? AppColors.secondary
+                        : Colors.transparent,
                     width: 1.5,
                   ),
                 ),
                 tileColor: _role == 'stock_controller'
-                    ? AppColors.secondary.withOpacity(0.08)
-                    : Colors.grey.withOpacity(0.06),
+                    ? AppColors.secondary.withValues(alpha: 0.08)
+                    : Colors.grey.withValues(alpha: 0.06),
                 leading: const CircleAvatar(
                   backgroundColor: AppColors.secondary,
                   child: Icon(Icons.warehouse, color: Colors.white),
                 ),
-                title: const Text('អ្នកគ្រប់គ្រងស្តុក (Stock Controller)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('stock@gmail.com • ពិនិត្យស្តុក, ផុតកំណត់, បញ្ចូលទំនិញ', style: TextStyle(fontSize: 11)),
-                trailing: _role == 'stock_controller' ? const Icon(Icons.check_circle, color: AppColors.secondary) : null,
+                title: const Text('អ្នកគ្រប់គ្រងស្តុក (Stock Controller)',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('ពិនិត្យស្តុក, ផុតកំណត់, បញ្ចូលទំនិញ',
+                    style: TextStyle(fontSize: 11)),
+                trailing: _role == 'stock_controller'
+                    ? const Icon(Icons.check_circle, color: AppColors.secondary)
+                    : null,
                 onTap: () {
                   Navigator.pop(bottomSheetCtx);
+                  final matched =
+                      _martService.users.cast<UserModel?>().firstWhere(
+                            (u) => u?.role == 'stock_controller',
+                            orElse: () => null,
+                          );
                   _promptPasswordAndSwitchRole(
                     targetRole: 'stock_controller',
-                    targetFullName: 'Vin (Stock Controller)',
-                    targetEmail: 'stock@gmail.com',
+                    targetEmail: matched?.email ?? '',
                     targetLabelKh: 'អ្នកគ្រប់គ្រងស្តុក (Stock Controller)',
                     roleColor: AppColors.secondary,
                     roleIcon: Icons.warehouse,
@@ -290,26 +333,35 @@ class _NavigationMenuState extends State<NavigationMenu> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(
-                    color: _role == 'admin' ? Colors.indigo : Colors.transparent,
+                    color:
+                        _role == 'admin' ? Colors.indigo : Colors.transparent,
                     width: 1.5,
                   ),
                 ),
                 tileColor: _role == 'admin'
-                    ? Colors.indigo.withOpacity(0.08)
-                    : Colors.grey.withOpacity(0.06),
+                    ? Colors.indigo.withValues(alpha: 0.08)
+                    : Colors.grey.withValues(alpha: 0.06),
                 leading: const CircleAvatar(
                   backgroundColor: Colors.indigo,
                   child: Icon(Icons.admin_panel_settings, color: Colors.white),
                 ),
-                title: const Text('អ្នកគ្រប់គ្រងទូទៅ (Admin)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('admin@gmail.com • របាយការណ៍ហិរញ្ញវត្ថុ, គ្រប់គ្រងម៉ាត', style: TextStyle(fontSize: 11)),
-                trailing: _role == 'admin' ? const Icon(Icons.check_circle, color: Colors.indigo) : null,
+                title: const Text('អ្នកគ្រប់គ្រងទូទៅ (Admin)',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('របាយការណ៍ហិរញ្ញវត្ថុ, គ្រប់គ្រងម៉ាត',
+                    style: TextStyle(fontSize: 11)),
+                trailing: _role == 'admin'
+                    ? const Icon(Icons.check_circle, color: Colors.indigo)
+                    : null,
                 onTap: () {
                   Navigator.pop(bottomSheetCtx);
+                  final matched =
+                      _martService.users.cast<UserModel?>().firstWhere(
+                            (u) => u?.role == 'admin',
+                            orElse: () => null,
+                          );
                   _promptPasswordAndSwitchRole(
                     targetRole: 'admin',
-                    targetFullName: 'Ngam Vin (Admin)',
-                    targetEmail: 'admin@gmail.com',
+                    targetEmail: matched?.email ?? '',
                     targetLabelKh: 'អ្នកគ្រប់គ្រងទូទៅ (Admin)',
                     roleColor: Colors.indigo,
                     roleIcon: Icons.admin_panel_settings,
@@ -325,11 +377,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
 
   Future<void> _signOut() async {
     EasyLoading.show(status: 'កំពុងចាកចេញ...');
-    try {
-      final sp = await SharedPreferences.getInstance();
-      await sp.clear();
-      await FirebaseAuth.instance.signOut();
-    } catch (_) {}
+    await _martService.logout();
     EasyLoading.dismiss();
 
     if (!mounted) return;
@@ -346,11 +394,12 @@ class _NavigationMenuState extends State<NavigationMenu> {
       barrierDismissible: false,
       builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.logout, color: AppColors.danger),
             SizedBox(width: 8),
-            Text('ចាកចេញពីប្រព័ន្ធ (Logout)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('ចាកចេញពីប្រព័ន្ធ (Logout)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ],
         ),
         content: const Text('តើអ្នកពិតជាចង់ចាកចេញពីគណនីនេះមែនទេ?'),
@@ -363,7 +412,8 @@ class _NavigationMenuState extends State<NavigationMenu> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('ចាកចេញ'),
@@ -387,7 +437,10 @@ class _NavigationMenuState extends State<NavigationMenu> {
     String roleLabel = isEn ? 'Cashier' : 'បេឡាករ (Cashier)';
     IconData roleIcon = Icons.point_of_sale;
     Color roleColor = AppColors.primary;
-    List<Color> headerGradient = [const Color(0xFF0F766E), const Color(0xFF115E59)];
+    List<Color> headerGradient = [
+      const Color(0xFF0F766E),
+      const Color(0xFF115E59)
+    ];
 
     if (isAdmin) {
       roleLabel = isEn ? 'Administrator' : 'អ្នកគ្រប់គ្រងទូទៅ (Admin)';
@@ -408,7 +461,8 @@ class _NavigationMenuState extends State<NavigationMenu> {
           // ── PREMIUM CUSTOM HEADER ──
           Container(
             width: double.infinity,
-            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 14, 16, 16),
+            padding: EdgeInsets.fromLTRB(
+                16, MediaQuery.of(context).padding.top + 14, 16, 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: headerGradient,
@@ -417,7 +471,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: headerGradient.first.withOpacity(0.25),
+                  color: headerGradient.first.withValues(alpha: 0.25),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -432,7 +486,9 @@ class _NavigationMenuState extends State<NavigationMenu> {
                       padding: const EdgeInsets.all(2.5),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.7), width: 2),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            width: 2),
                       ),
                       child: CircleAvatar(
                         radius: 26,
@@ -446,7 +502,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            fullname ?? (isEn ? 'Dara Chan' : 'តារា ចាន់'),
+                            fullname ?? '',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -456,9 +512,10 @@ class _NavigationMenuState extends State<NavigationMenu> {
                           ),
                           const SizedBox(height: 3),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -477,19 +534,22 @@ class _NavigationMenuState extends State<NavigationMenu> {
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.18),
+                    color: Colors.black.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.storefront_rounded, size: 14, color: Colors.white70),
+                      const Icon(Icons.storefront_rounded,
+                          size: 14, color: Colors.white70),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           '${isEn ? setting.martNameEn : setting.martNameKh} • $email',
-                          style: const TextStyle(fontSize: 11, color: Colors.white70),
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.white70),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -503,17 +563,19 @@ class _NavigationMenuState extends State<NavigationMenu> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.25)),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.swap_horiz, size: 16, color: Colors.white),
+                        const Icon(Icons.swap_horiz,
+                            size: 16, color: Colors.white),
                         const SizedBox(width: 6),
                         Text(
-                          isEn ? 'Switch Role Demo' : 'ប្តូរតួនាទី (Switch Role)',
+                          isEn ? 'Switch Role' : 'ប្តូរតួនាទី',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -534,116 +596,184 @@ class _NavigationMenuState extends State<NavigationMenu> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 // SECTION 1: CASHIER OPERATIONS
-                _buildSectionHeader(isEn ? 'Cashier Operations' : 'ផ្នែកគិតប្រាក់ (Cashier)', icon: Icons.point_of_sale_rounded),
+                _buildSectionHeader(
+                    isEn ? 'Cashier Operations' : 'ផ្នែកគិតប្រាក់ (Cashier)',
+                    icon: Icons.point_of_sale_rounded),
                 _buildMenuItem(
                   icon: Icons.point_of_sale_rounded,
                   iconColor: AppColors.primary,
                   title: 'POS Terminal',
-                  subtitle: isEn ? 'Scan barcode, Pay, KHQR' : 'ស្កេនបាកូដ, គិតប្រាក់, KHQR',
+                  subtitle: isEn
+                      ? 'Scan barcode, Pay, KHQR'
+                      : 'ស្កេនបាកូដ, គិតប្រាក់, KHQR',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const PosScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const PosScreen()));
                   },
                 ),
                 _buildMenuItem(
                   icon: Icons.account_balance_wallet_outlined,
                   iconColor: AppColors.khqrBakongRed,
                   title: isEn ? 'Shift Drawer' : 'វេនការងារ (Shift Drawer)',
-                  subtitle: isEn ? 'Open/Close shift, cash count' : 'បើក/បិទវេន, រាប់សាច់ប្រាក់',
+                  subtitle: isEn
+                      ? 'Open/Close shift, cash count'
+                      : 'បើក/បិទវេន, រាប់សាច់ប្រាក់',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ShiftScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ShiftScreen()));
                   },
                 ),
                 _buildMenuItem(
                   icon: Icons.receipt_long_outlined,
                   iconColor: AppColors.success,
                   title: isEn ? 'Sales Invoices' : 'វិក្កយបត្រលក់ (Invoices)',
-                  subtitle: isEn ? 'View & reprint receipts' : 'មើលវិក្កយបត្រ & បោះពុម្ពឡើងវិញ',
+                  subtitle: isEn
+                      ? 'View & reprint receipts'
+                      : 'មើលវិក្កយបត្រ & បោះពុម្ពឡើងវិញ',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const InvoiceScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const InvoiceScreen()));
                   },
                 ),
                 _buildMenuItem(
                   icon: Icons.people_alt_outlined,
                   iconColor: Colors.pink,
-                  title: isEn ? 'Customer Loyalty' : 'អតិថិជន (Customer Loyalty)',
-                  subtitle: isEn ? 'Phone search & earn points' : 'ស្វែងរកតាមលេខទូរស័ព្ទ & សន្សំពិន្ទុ',
+                  title:
+                      isEn ? 'Customer Loyalty' : 'អតិថិជន (Customer Loyalty)',
+                  subtitle: isEn
+                      ? 'Phone search & earn points'
+                      : 'ស្វែងរកតាមលេខទូរស័ព្ទ & សន្សំពិន្ទុ',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomerScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const CustomerScreen()));
                   },
                 ),
 
                 const SizedBox(height: 6),
 
                 // SECTION 2: STOCK CONTROLLER OPERATIONS
-                _buildSectionHeader(isEn ? 'Stock & Inventory' : 'ផ្នែកគ្រប់គ្រងស្តុក (Stock & Inventory)', icon: Icons.warehouse_rounded),
+                _buildSectionHeader(
+                    isEn
+                        ? 'Stock & Inventory'
+                        : 'ផ្នែកគ្រប់គ្រងស្តុក (Stock & Inventory)',
+                    icon: Icons.warehouse_rounded),
                 _buildMenuItem(
                   icon: Icons.warehouse_outlined,
                   iconColor: AppColors.warning,
-                  title: isEn ? 'Stock & Expiry' : 'ស្តុក & ផុតកំណត់ (Stock & Expiry)',
-                  subtitle: isEn ? 'Low stock alert & restock' : 'ប្រកាសអាសន្នជិតអស់ & បញ្ចូលស្តុក',
+                  title: isEn
+                      ? 'Stock & Expiry'
+                      : 'ស្តុក & ផុតកំណត់ (Stock & Expiry)',
+                  subtitle: isEn
+                      ? 'Low stock alert & restock'
+                      : 'ប្រកាសអាសន្នជិតអស់ & បញ្ចូលស្តុក',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const StockScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const StockScreen()));
                   },
                 ),
                 _buildMenuItem(
                   icon: Icons.inventory_2_outlined,
                   iconColor: AppColors.info,
-                  title: isEn ? 'Products & Barcode' : 'ទំនិញ (Products & Barcode)',
-                  subtitle: isEn ? 'Create products, barcodes & prices' : 'បង្កើតទំនិញថ្មី, កំណត់បាកូដ & តម្លៃ',
+                  title: isEn
+                      ? 'Products & Barcode'
+                      : 'ទំនិញ (Products & Barcode)',
+                  subtitle: isEn
+                      ? 'Create products, barcodes & prices'
+                      : 'បង្កើតទំនិញថ្មី, កំណត់បាកូដ & តម្លៃ',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ProductScreen()));
                   },
                 ),
                 _buildMenuItem(
                   icon: Icons.category_outlined,
                   iconColor: Colors.purple,
                   title: isEn ? 'Categories' : 'ប្រភេទទំនិញ (Categories)',
-                  subtitle: isEn ? 'Beverages, snacks, grocery...' : 'ភេសជ្ជៈ, នំចំណី, អាហារកំប៉ុង...',
+                  subtitle: isEn
+                      ? 'Beverages, snacks, grocery...'
+                      : 'ភេសជ្ជៈ, នំចំណី, អាហារកំប៉ុង...',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CategoryScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const CategoryScreen()));
                   },
                 ),
 
                 const SizedBox(height: 6),
 
                 // SECTION 3: MANAGEMENT & SETTINGS
-                _buildSectionHeader(isEn ? 'Management & Settings' : 'គ្រប់គ្រង & ប្រព័ន្ធ (Management & Settings)', icon: Icons.tune_rounded),
+                _buildSectionHeader(
+                    isEn
+                        ? 'Management & Settings'
+                        : 'គ្រប់គ្រង & ប្រព័ន្ធ (Management & Settings)',
+                    icon: Icons.tune_rounded),
                 if (isAdmin)
                   _buildMenuItem(
                     icon: Icons.manage_accounts_rounded,
                     iconColor: const Color(0xFF0284C7),
-                    title: isEn ? 'User Management' : 'គ្រប់គ្រងអ្នកប្រើប្រាស់ (Users)',
-                    subtitle: isEn ? 'Add, edit, delete staff & roles' : 'បន្ថែម, កែប្រែ, លុបគណនីបុគ្គលិក',
+                    title: isEn
+                        ? 'User Management'
+                        : 'គ្រប់គ្រងអ្នកប្រើប្រាស់ (Users)',
+                    subtitle: isEn
+                        ? 'Add, edit, delete staff & roles'
+                        : 'បន្ថែម, កែប្រែ, លុបគណនីបុគ្គលិក',
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const UserManagementScreen()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const UserManagementScreen()));
                     },
                   ),
                 _buildMenuItem(
                   icon: Icons.bar_chart_rounded,
                   iconColor: Colors.indigo,
                   title: isEn ? 'Analytics & Reports' : 'របាយការណ៍ (Analytics)',
-                  subtitle: isEn ? 'Revenue, expense & profit' : 'ចំណូល, ចំណាយ, និងប្រាក់ចំណេញ',
+                  subtitle: isEn
+                      ? 'Revenue, expense & profit'
+                      : 'ចំណូល, ចំណាយ, និងប្រាក់ចំណេញ',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ReportScreen()));
                   },
                 ),
                 _buildMenuItem(
                   icon: Icons.settings_outlined,
                   iconColor: AppColors.textSecondary,
                   title: isEn ? 'Mart Settings' : 'ការកំណត់ (Settings)',
-                  subtitle: isEn ? 'Exchange rate, store info, KHQR' : 'អត្រាប្តូរប្រាក់, ឈ្មោះម៉ាត, KHQR',
+                  subtitle: isEn
+                      ? 'Exchange rate, store info, KHQR'
+                      : 'អត្រាប្តូរប្រាក់, ឈ្មោះម៉ាត, KHQR',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SettingScreen()));
                   },
                 ),
               ],
@@ -663,19 +793,24 @@ class _NavigationMenuState extends State<NavigationMenu> {
                   onTap: () => _confirmSignOut(),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.danger.withOpacity(0.08),
+                      color: AppColors.danger.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.danger.withOpacity(0.25)),
+                      border: Border.all(
+                          color: AppColors.danger.withValues(alpha: 0.25)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.logout_rounded, color: AppColors.danger, size: 20),
+                        const Icon(Icons.logout_rounded,
+                            color: AppColors.danger, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            isEn ? 'Logout System' : 'ចាកចេញពីប្រព័ន្ធ (Logout)',
+                            isEn
+                                ? 'Logout System'
+                                : 'ចាកចេញពីប្រព័ន្ធ (Logout)',
                             style: const TextStyle(
                               color: AppColors.danger,
                               fontWeight: FontWeight.bold,
@@ -683,7 +818,8 @@ class _NavigationMenuState extends State<NavigationMenu> {
                             ),
                           ),
                         ),
-                        const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.danger, size: 13),
+                        const Icon(Icons.arrow_forward_ios_rounded,
+                            color: AppColors.danger, size: 13),
                       ],
                     ),
                   ),
@@ -717,7 +853,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
         leading: Container(
           padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.12),
+            color: iconColor.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(9),
           ),
           child: Icon(icon, color: iconColor, size: 20),
@@ -733,12 +869,14 @@ class _NavigationMenuState extends State<NavigationMenu> {
         subtitle: subtitle != null
             ? Text(
                 subtitle,
-                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                style: const TextStyle(
+                    fontSize: 11, color: AppColors.textSecondary),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               )
             : null,
-        trailing: Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey.shade400),
+        trailing: Icon(Icons.chevron_right_rounded,
+            size: 18, color: Colors.grey.shade400),
         onTap: onTap,
       ),
     );

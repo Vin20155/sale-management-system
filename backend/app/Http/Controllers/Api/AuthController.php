@@ -15,6 +15,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'username' => 'required|string',
             'password' => 'required|string',
+            'role' => 'sometimes|required|string|in:admin,cashier,stock_controller',
         ]);
 
         if ($validator->fails()) {
@@ -25,9 +26,10 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('username', $request->username)
-                    ->orWhere('email', $request->username)
-                    ->first();
+        $login = trim($request->input('username'));
+        $user = User::where('username', $login)
+            ->orWhere('email', $login)
+            ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -43,10 +45,14 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Mock/Sanctum token
-        $token = method_exists($user, 'createToken') 
-            ? $user->createToken('mart_pos_token')->plainTextToken 
-            : base64_encode($user->id . ':' . time());
+        if ($request->filled('role') && $request->input('role') !== $user->role) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ឈ្មោះគណនី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ',
+            ], 401);
+        }
+
+        $token = $user->createToken('mart_pos_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -66,17 +72,22 @@ class AuthController extends Controller
 
     public function profile(Request $request)
     {
+        if (!$request->user()->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account has been deactivated.',
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
-            'user' => $request->user() ?? User::first()
+            'user' => $request->user()
         ]);
     }
 
     public function logout(Request $request)
     {
-        if ($request->user() && method_exists($request->user(), 'currentAccessToken')) {
-            $request->user()->currentAccessToken()->delete();
-        }
+        $request->user()->currentAccessToken()->delete();
 
         return response()->json([
             'success' => true,

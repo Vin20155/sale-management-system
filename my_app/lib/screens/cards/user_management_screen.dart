@@ -44,20 +44,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Future<void> _loadCurrentUserInfo() async {
     final sp = await SharedPreferences.getInstance();
     setState(() {
-      _currentUserEmail = sp.getString('EMAIL') ?? 'admin@gmail.com';
+      _currentUserEmail = sp.getString('EMAIL');
     });
   }
 
-  void _loadUsers() {
+  Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
-    final list = _martService.getUsers(
+    final list = await _martService.getUsers(
       search: _searchController.text.trim(),
       roleFilter: _selectedRoleFilter == 'all' ? null : _selectedRoleFilter,
     );
-    setState(() {
-      _users = list;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _users = list;
+        _isLoading = false;
+      });
+    }
   }
 
   Color _getRoleColor(String role) {
@@ -104,7 +106,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final nameCtrl = TextEditingController(text: user?.name ?? '');
     final emailCtrl = TextEditingController(text: user?.email ?? '');
     final phoneCtrl = TextEditingController(text: user?.phone ?? '');
-    final passCtrl = TextEditingController(text: '123456');
+    final passCtrl = TextEditingController();
 
     String selectedRole = user?.role ?? 'cashier';
     bool isActive = user?.isActive ?? true;
@@ -120,7 +122,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           title: Row(
             children: [
               CircleAvatar(
-                backgroundColor: _getRoleColor(selectedRole).withOpacity(0.15),
+                backgroundColor: _getRoleColor(selectedRole).withValues(alpha: 0.15),
                 child: Icon(_getRoleIcon(selectedRole), color: _getRoleColor(selectedRole), size: 22),
               ),
               const SizedBox(width: 10),
@@ -184,7 +186,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                   // Role selector
                   DropdownButtonFormField<String>(
-                    value: selectedRole,
+                    initialValue: selectedRole,
                     isExpanded: true,
                     decoration: InputDecoration(
                       labelText: isEn ? 'Assign Role *' : 'តួនាទី (Role) *',
@@ -256,30 +258,31 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Password field (only for new user or optional reset)
-                  if (!isEdit) ...[
-                    TextField(
-                      controller: passCtrl,
-                      obscureText: !isPasswordVisible,
-                      decoration: InputDecoration(
-                        labelText: isEn ? 'Default Password' : 'ពាក្យសម្ងាត់ដំបូង',
-                        hintText: '123456',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                            size: 18,
-                          ),
-                          onPressed: () {
-                            setDialogState(() => isPasswordVisible = !isPasswordVisible);
-                          },
+                  TextField(
+                    controller: passCtrl,
+                    obscureText: !isPasswordVisible,
+                    decoration: InputDecoration(
+                      labelText: isEdit
+                          ? (isEn ? 'New Password (optional)' : 'ពាក្យសម្ងាត់ថ្មី (មិនបាច់បញ្ចូលក៏បាន)')
+                          : (isEn ? 'Password *' : 'ពាក្យសម្ងាត់ *'),
+                      hintText: isEdit
+                          ? (isEn ? 'Leave blank to keep current password' : 'ទុកទទេដើម្បីរក្សាពាក្យសម្ងាត់ចាស់')
+                          : null,
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                          size: 18,
                         ),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        onPressed: () {
+                          setDialogState(() => isPasswordVisible = !isPasswordVisible);
+                        },
                       ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
-                    const SizedBox(height: 12),
-                  ],
+                  ),
+                  const SizedBox(height: 12),
 
                   // Status switch
                   Row(
@@ -301,7 +304,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           ),
                           Switch(
                             value: isActive,
-                            activeColor: AppColors.success,
+                            activeThumbColor: AppColors.success,
                             onChanged: (val) {
                               setDialogState(() => isActive = val);
                             },
@@ -329,7 +332,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 final name = nameCtrl.text.trim();
                 final email = emailCtrl.text.trim();
                 final phone = phoneCtrl.text.trim();
-                final pass = passCtrl.text.trim();
+                final pass = passCtrl.text;
 
                 if (name.isEmpty) {
                   EasyLoading.showToast(isEn ? 'Please enter user name' : 'សូមបញ្ចូលឈ្មោះអ្នកប្រើប្រាស់');
@@ -339,8 +342,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   EasyLoading.showToast(isEn ? 'Please enter a valid email' : 'សូមបញ្ចូលអ៊ីមែលឱ្យបានត្រឹមត្រូវ');
                   return;
                 }
+                if ((!isEdit && pass.length < 6) ||
+                    (pass.isNotEmpty && pass.length < 6)) {
+                  EasyLoading.showToast(
+                    isEn
+                        ? 'Password must be at least 6 characters.'
+                        : 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច ៦ តួអក្សរ។',
+                  );
+                  return;
+                }
 
                 Navigator.pop(dialogCtx);
+                EasyLoading.show(status: isEn ? 'Saving...' : 'កំពុងរក្សាទុក...');
 
                 if (isEdit) {
                   final ok = await _martService.updateUser(
@@ -350,12 +363,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     role: selectedRole,
                     phone: phone,
                     isActive: isActive,
+                    password: pass.isEmpty ? null : pass,
                   );
                   if (ok) {
+                    if (_currentUserEmail != null && user.email.toLowerCase() == _currentUserEmail!.toLowerCase()) {
+                      final sp = await SharedPreferences.getInstance();
+                      await sp.setString("FULLNAME", name);
+                      await sp.setString("EMAIL", email);
+                      await sp.setString("ROLE", selectedRole);
+                      setState(() {
+                        _currentUserEmail = email;
+                      });
+                    }
                     EasyLoading.showSuccess(isEn ? 'User updated successfully!' : 'បានកែប្រែអ្នកប្រើប្រាស់ជោគជ័យ!');
-                    _loadUsers();
+                    await _loadUsers();
                   } else {
-                    EasyLoading.showError(isEn ? 'Email already used by another user' : 'អ៊ីមែលនេះមានរួចហើយ!');
+                    EasyLoading.showError(isEn ? 'Failed to update user. Email may be already used.' : 'អ៊ីមែលនេះមានរួចហើយ ឬមិនអាចកែប្រែបានទេ!');
                   }
                 } else {
                   final ok = await _martService.addUser(
@@ -367,9 +390,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   );
                   if (ok) {
                     EasyLoading.showSuccess(isEn ? 'User created successfully!' : 'បានបង្កើតអ្នកប្រើប្រាស់ជោគជ័យ!');
-                    _loadUsers();
+                    await _loadUsers();
                   } else {
-                    EasyLoading.showError(isEn ? 'Email already exists' : 'អ៊ីមែលនេះមានក្នុងប្រព័ន្ធរួចហើយ!');
+                    EasyLoading.showError(isEn ? 'Failed to create user. Email may already exist.' : 'អ៊ីមែលនេះមានក្នុងប្រព័ន្ធរួចហើយ!');
                   }
                 }
               },
@@ -434,10 +457,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
 
     if (confirmed == true) {
+      EasyLoading.show(status: isEn ? 'Deleting...' : 'កំពុងលុប...');
       final ok = await _martService.deleteUser(user.id);
       if (ok) {
         EasyLoading.showSuccess(isEn ? 'User deleted successfully!' : 'បានលុបអ្នកប្រើប្រាស់ជោគជ័យ!');
-        _loadUsers();
+        await _loadUsers();
+      } else {
+        EasyLoading.showError(isEn ? 'Failed to delete user' : 'មិនអាចលុបអ្នកប្រើប្រាស់បានទេ!');
       }
     }
   }
@@ -465,6 +491,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: isEn ? 'Refresh' : 'ផ្ទុកឡើងវិញ',
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () => _loadUsers(),
+          ),
           IconButton(
             tooltip: isEn ? 'Add User' : 'បន្ថែមអ្នកប្រើប្រាស់ថ្មី',
             icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
@@ -555,21 +586,29 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _users.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.people_outline, size: 56, color: Colors.grey.shade400),
-                            const SizedBox(height: 12),
-                            Text(
-                              isEn ? 'No users found matching query' : 'មិនមានអ្នកប្រើប្រាស់ដែលត្រូវនឹងលក្ខខណ្ឌទេ',
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
+                : RefreshIndicator(
+                    onRefresh: _loadUsers,
+                    child: _users.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.people_outline, size: 56, color: Colors.grey.shade400),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      isEn ? 'No users found matching query' : 'មិនមានអ្នកប្រើប្រាស់ដែលត្រូវនឹងលក្ខខណ្ឌទេ',
+                                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
                         itemCount: _users.length,
                         itemBuilder: (context, index) {
@@ -593,11 +632,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                     padding: const EdgeInsets.all(2),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: roleColor.withOpacity(0.5), width: 1.5),
+                                      border: Border.all(color: roleColor.withValues(alpha: 0.5), width: 1.5),
                                     ),
                                     child: CircleAvatar(
                                       radius: 22,
-                                      backgroundColor: roleColor.withOpacity(0.12),
+                                      backgroundColor: roleColor.withValues(alpha: 0.12),
                                       child: Icon(roleIcon, color: roleColor, size: 24),
                                     ),
                                   ),
@@ -626,7 +665,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.indigo.withOpacity(0.15),
+                                                  color: Colors.indigo.withValues(alpha: 0.15),
                                                   borderRadius: BorderRadius.circular(6),
                                                 ),
                                                 child: Text(
@@ -675,9 +714,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: roleColor.withOpacity(0.12),
+                                                color: roleColor.withValues(alpha: 0.12),
                                                 borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: roleColor.withOpacity(0.3), width: 0.8),
+                                                border: Border.all(color: roleColor.withValues(alpha: 0.3), width: 0.8),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
@@ -701,8 +740,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: user.isActive
-                                                    ? AppColors.success.withOpacity(0.12)
-                                                    : Colors.grey.withOpacity(0.15),
+                                                    ? AppColors.success.withValues(alpha: 0.12)
+                                                    : Colors.grey.withValues(alpha: 0.15),
                                                 borderRadius: BorderRadius.circular(6),
                                               ),
                                               child: Text(
@@ -748,6 +787,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           );
                         },
                       ),
+                  ),
           ),
         ],
       ),

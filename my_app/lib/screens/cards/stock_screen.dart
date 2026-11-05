@@ -97,7 +97,7 @@ class _StockScreenState extends State<StockScreen> with SingleTickerProviderStat
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: AppColors.danger.withOpacity(0.12),
+              backgroundColor: AppColors.danger.withValues(alpha: 0.12),
               child: const Icon(Icons.production_quantity_limits, color: AppColors.danger),
             ),
             title: Text(p.nameKh, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -151,7 +151,7 @@ class _StockScreenState extends State<StockScreen> with SingleTickerProviderStat
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: AppColors.warning.withOpacity(0.15),
+              backgroundColor: AppColors.warning.withValues(alpha: 0.15),
               child: const Icon(Icons.alarm_on, color: AppColors.warning),
             ),
             title: Text(p.nameKh, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -159,7 +159,7 @@ class _StockScreenState extends State<StockScreen> with SingleTickerProviderStat
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.warning.withOpacity(0.15),
+                color: AppColors.warning.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: const Text('ជិតដល់កាលបរិច្ឆេទ', style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold, fontSize: 10)),

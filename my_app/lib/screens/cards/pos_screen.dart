@@ -4,6 +4,7 @@ import 'package:my_app/config/app_colors.dart';
 import 'package:my_app/config/app_language.dart';
 import 'package:my_app/models/mart_models.dart';
 import 'package:my_app/services/mart_service.dart';
+import 'package:my_app/widgets/product_image.dart';
 
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
@@ -30,7 +31,26 @@ class _PosScreenState extends State<PosScreen> {
   void initState() {
     super.initState();
     AppLanguage.languageNotifier.addListener(_onLanguageChanged);
+    _martService.productsRevision.addListener(_onProductsChanged);
     _loadData();
+  }
+
+  void _onProductsChanged() {
+    if (!mounted) return;
+    final search = _searchController.text.trim().toLowerCase();
+    setState(() {
+      _products = _martService.products.where((product) {
+        if (!product.isActive) return false;
+        if (_selectedCategoryId > 0 &&
+            product.categoryId != _selectedCategoryId) {
+          return false;
+        }
+        return search.isEmpty ||
+            product.nameKh.toLowerCase().contains(search) ||
+            product.nameEn.toLowerCase().contains(search) ||
+            product.barcode.toLowerCase().contains(search);
+      }).toList();
+    });
   }
 
   void _onLanguageChanged() {
@@ -40,6 +60,7 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void dispose() {
     AppLanguage.languageNotifier.removeListener(_onLanguageChanged);
+    _martService.productsRevision.removeListener(_onProductsChanged);
     _searchController.dispose();
     _barcodeController.dispose();
     super.dispose();
@@ -153,7 +174,7 @@ class _PosScreenState extends State<PosScreen> {
             onPressed: _showBarcodeScanDialog,
           ),
           IconButton(
-            tooltip: AppLanguage.isEnglish ? 'Customer Loyalty Search' : 'ស្វែងរកអតិថិជនសន្ំពិន្ទុ',
+            tooltip: AppLanguage.isEnglish ? 'Customer Loyalty Search' : 'ស្វែងរកអតិថិជន',
             icon: const Icon(Icons.person_search, color: Colors.white),
             onPressed: _showCustomerLookupDialog,
           ),
@@ -199,7 +220,7 @@ class _PosScreenState extends State<PosScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   style: IconButton.styleFrom(
-                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.barcode_reader, color: AppColors.primary),
@@ -321,8 +342,8 @@ class _PosScreenState extends State<PosScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: product.isLowStock
-                          ? AppColors.danger.withOpacity(0.12)
-                          : AppColors.success.withOpacity(0.12),
+                          ? AppColors.danger.withValues(alpha: 0.12)
+                          : AppColors.success.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -338,16 +359,15 @@ class _PosScreenState extends State<PosScreen> {
               ),
               const Spacer(),
 
-              // Product Icon / Graphic Placeholder
+              // Product image
               Center(
-                child: Container(
-                  height: 48,
-                  width: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.shopping_bag_outlined, color: AppColors.primary, size: 26),
+                child: ProductImage(
+                  productId: product.id,
+                  imageUrl: product.imageUrl,
+                  width: 84,
+                  height: 84,
+                  borderRadius: BorderRadius.circular(12),
+                  placeholderIcon: Icons.shopping_bag_outlined,
                 ),
               ),
               const Spacer(),
@@ -417,7 +437,7 @@ class _PosScreenState extends State<PosScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             offset: const Offset(0, -3),
             blurRadius: 10,
           )
@@ -717,9 +737,9 @@ class _PosScreenState extends State<PosScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.08),
+                          color: AppColors.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -844,7 +864,7 @@ class _PosScreenState extends State<PosScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: changeUsd > 0 ? AppColors.success.withOpacity(0.1) : AppColors.surface,
+                            color: changeUsd > 0 ? AppColors.success.withValues(alpha: 0.1) : AppColors.surface,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -1228,7 +1248,10 @@ class _PosScreenState extends State<PosScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('ស្វែងរកអតិថិជនសន្ំពិន្ទុ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          title: Text(
+            AppLanguage.isEnglish
+                ? 'Customer Loyalty Search'
+                : 'ស្វែងរកអតិថិជនសន្សំពិន្ទុ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -39,6 +39,11 @@
    ```
 
 ### ជំហានទី ៣: ដំណើរការ Laravel API Server
+កម្មវិធី Flutter ទាញយករូបភាពទំនិញតាម API ដោយផ្ទាល់។ បើចង់បើករូបភាពតាម public URL ផ្ទាល់ សូមបង្កើត symbolic link សម្រាប់ public storage ម្តង:
+```bash
+php artisan storage:link
+```
+
 ដំណើរការ Command:
 ```bash
 php artisan serve --host=0.0.0.0 --port=8000
@@ -56,8 +61,8 @@ Server នឹងដំណើរការនៅអាសយដ្ឋាន `http:
 | `GET` | `/api/products/barcode/{code}` | ស្វែងរកទំនិញតាមបាកូដ |
 | `GET` | `/api/products/alerts/low-stock` | ទំនិញដែលជិតអស់ពីស្តុក |
 | `GET` | `/api/products/alerts/expiring` | ទំនិញដែលជិតផុតកំណត់កាលបរិច្ឆេទ |
-| `POST` | `/api/products` | បន្ថែមទំនិញថ្មី |
-| `PUT` | `/api/products/{id}` | កែប្រែព័ត៌មានទំនិញ |
+| `POST` | `/api/products` | បន្ថែមទំនិញថ្មី (អាចផ្ទុករូបភាព JPEG, PNG ឬ WebP រហូតដល់ 5 MB) |
+| `PUT` | `/api/products/{id}` | កែប្រែព័ត៌មាន និងរូបភាពទំនិញ |
 | `GET` | `/api/categories` | ប្រភេទទំនិញម៉ាតទាំងអស់ |
 | `POST` | `/api/orders` | គិតលុយលក់ទំនិញ (Checkout & Stock Deduction) |
 | `GET` | `/api/orders` | ប្រវត្តិវិក្កយបត្រទាំងអស់ |

@@ -83,7 +83,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: isKhqr ? AppColors.khqrBakongRed.withOpacity(0.12) : AppColors.success.withOpacity(0.12),
+                                      color: isKhqr ? AppColors.khqrBakongRed.withValues(alpha: 0.12) : AppColors.success.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(

@@ -1,8 +1,11 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:my_app/config/app_colors.dart';
 import 'package:my_app/models/mart_models.dart';
 import 'package:my_app/services/mart_service.dart';
+import 'package:my_app/widgets/product_image.dart';
 
 class ProductScreen extends StatefulWidget {
   final int? initialCategoryId;
@@ -147,15 +150,11 @@ class _ProductScreenState extends State<ProductScreen> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Product thumbnail placeholder
-                                  Container(
+                                  ProductImage(
+                                    productId: product.id,
+                                    imageUrl: product.imageUrl,
                                     width: 54,
                                     height: 54,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(Icons.fastfood_outlined, color: AppColors.primary, size: 28),
                                   ),
                                   const SizedBox(width: 12),
 
@@ -203,7 +202,7 @@ class _ProductScreenState extends State<ProductScreen> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: AppColors.primary.withOpacity(0.12),
+                                                color: AppColors.primary.withValues(alpha: 0.12),
                                                 borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Row(
@@ -241,8 +240,8 @@ class _ProductScreenState extends State<ProductScreen> {
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: product.isLowStock
-                                                    ? AppColors.danger.withOpacity(0.12)
-                                                    : AppColors.success.withOpacity(0.12),
+                                                    ? AppColors.danger.withValues(alpha: 0.12)
+                                                    : AppColors.success.withValues(alpha: 0.12),
                                                 borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Text(
@@ -261,7 +260,7 @@ class _ProductScreenState extends State<ProductScreen> {
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
                                                   color: product.isExpiringSoon
-                                                      ? AppColors.warning.withOpacity(0.15)
+                                                      ? AppColors.warning.withValues(alpha: 0.15)
                                                       : Colors.grey.shade100,
                                                   borderRadius: BorderRadius.circular(4),
                                                 ),
@@ -389,6 +388,9 @@ class _ProductScreenState extends State<ProductScreen> {
     final priceUsdCtrl = TextEditingController(text: product != null ? product.sellingPriceUsd.toString() : '0.50');
     final stockCtrl = TextEditingController(text: product != null ? product.stockQuantity.toString() : '20');
     final expiryCtrl = TextEditingController(text: product?.expiryDate ?? '2027-12-31');
+    XFile? selectedImage;
+    Uint8List? selectedImageBytes;
+    bool removeExistingImage = false;
     
     int selectedCat = product?.categoryId ?? (_selectedCatId > 0 ? _selectedCatId : (_categories.isNotEmpty ? _categories.first.id : 1));
 
@@ -419,10 +421,86 @@ class _ProductScreenState extends State<ProductScreen> {
                     ),
                     const SizedBox(height: 16),
 
+                    Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: selectedImageBytes != null
+                              ? Image.memory(
+                                  selectedImageBytes!,
+                                  width: 110,
+                                  height: 110,
+                                  fit: BoxFit.cover,
+                                )
+                              : ProductImage(
+                                  productId: product?.id,
+                                  imageUrl: removeExistingImage
+                                      ? null
+                                      : product?.imageUrl,
+                                  width: 110,
+                                  height: 110,
+                                ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    final picked =
+                                        await ImagePicker().pickImage(
+                                      source: ImageSource.gallery,
+                                      imageQuality: 85,
+                                      maxWidth: 1600,
+                                    );
+                                    if (picked == null) return;
+                                    final bytes = await picked.readAsBytes();
+                                    setModalState(() {
+                                      selectedImage = picked;
+                                      selectedImageBytes = bytes;
+                                      removeExistingImage = false;
+                                    });
+                                  } catch (error) {
+                                    EasyLoading.showError(
+                                      'មិនអាចជ្រើសរើសរូបភាពបានទេ: $error',
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.photo_library_outlined),
+                                label: Text(
+                                  product?.imageUrl == null &&
+                                          selectedImage == null
+                                      ? 'ជ្រើសរើសរូបភាព'
+                                      : 'ប្តូររូបភាព',
+                                ),
+                              ),
+                              if (selectedImage != null ||
+                                  (product?.imageUrl != null &&
+                                      !removeExistingImage))
+                                TextButton.icon(
+                                  onPressed: () {
+                                    setModalState(() {
+                                      selectedImage = null;
+                                      selectedImageBytes = null;
+                                      removeExistingImage = true;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.delete_outline),
+                                  label: const Text('លុបរូបភាព'),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
                     // Category Selector Dropdown
                     if (_categories.isNotEmpty) ...[
                       DropdownButtonFormField<int>(
-                        value: _categories.any((c) => c.id == selectedCat) ? selectedCat : _categories.first.id,
+                        initialValue: _categories.any((c) => c.id == selectedCat) ? selectedCat : _categories.first.id,
                         decoration: InputDecoration(
                           labelText: 'ប្រភេទទំនិញ (Category)',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -542,40 +620,62 @@ class _ProductScreenState extends State<ProductScreen> {
                         } catch (_) {}
 
                         EasyLoading.show(status: 'កំពុងរក្សាទុក...');
-
-                        if (product == null) {
-                          final newP = ProductModel(
-                            id: DateTime.now().millisecondsSinceEpoch,
-                            barcode: barcode,
-                            nameEn: nameEn.isEmpty ? nameKh : nameEn,
-                            nameKh: nameKh,
-                            categoryId: selectedCat,
-                            categoryName: catName,
-                            unit: unitCtrl.text.trim(),
-                            sellingPriceUsd: priceUsd,
-                            sellingPriceKhr: priceKhr,
-                            stockQuantity: stock,
-                            expiryDate: expiryCtrl.text.trim(),
-                          );
-                          await _martService.addProduct(newP);
-                        } else {
-                          final updated = ProductModel(
-                            id: product.id,
-                            barcode: barcode,
-                            nameEn: nameEn,
-                            nameKh: nameKh,
-                            categoryId: selectedCat,
-                            categoryName: catName,
-                            unit: unitCtrl.text.trim(),
-                            sellingPriceUsd: priceUsd,
-                            sellingPriceKhr: priceKhr,
-                            stockQuantity: stock,
-                            expiryDate: expiryCtrl.text.trim(),
-                          );
-                          await _martService.updateProduct(updated);
+                        String? saveError;
+                        try {
+                          if (product == null) {
+                            final newP = ProductModel(
+                              id: DateTime.now().millisecondsSinceEpoch,
+                              barcode: barcode,
+                              nameEn: nameEn.isEmpty ? nameKh : nameEn,
+                              nameKh: nameKh,
+                              categoryId: selectedCat,
+                              categoryName: catName,
+                              unit: unitCtrl.text.trim(),
+                              sellingPriceUsd: priceUsd,
+                              sellingPriceKhr: priceKhr,
+                              stockQuantity: stock,
+                              expiryDate: expiryCtrl.text.trim(),
+                            );
+                            await _martService.addProduct(
+                              newP,
+                              image: selectedImage,
+                            );
+                          } else {
+                            final updated = ProductModel(
+                              id: product.id,
+                              barcode: barcode,
+                              nameEn: nameEn,
+                              nameKh: nameKh,
+                              categoryId: selectedCat,
+                              categoryName: catName,
+                              unit: unitCtrl.text.trim(),
+                              sellingPriceUsd: priceUsd,
+                              sellingPriceKhr: priceKhr,
+                              stockQuantity: stock,
+                              expiryDate: expiryCtrl.text.trim(),
+                              imageUrl:
+                                  removeExistingImage ? null : product.imageUrl,
+                            );
+                            await _martService.updateProduct(
+                              updated,
+                              image: selectedImage,
+                              removeImage: removeExistingImage,
+                            );
+                          }
+                        } catch (error) {
+                          saveError = error.toString();
+                        } finally {
+                          EasyLoading.dismiss();
                         }
 
-                        EasyLoading.dismiss();
+                        if (saveError != null) {
+                          EasyLoading.showError(
+                            'រក្សាទុកមិនបានជោគជ័យ: $saveError',
+                          );
+                          return;
+                        }
+
+                        if (!context.mounted) return;
                         Navigator.pop(context);
                         _loadProducts();
                         EasyLoading.showSuccess('បានរក្សាទុកដោយជោគជ័យ!');

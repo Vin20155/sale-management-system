@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\KhqrController;
+use App\Http\Controllers\Api\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,9 +20,11 @@ use App\Http\Controllers\Api\KhqrController;
 
 // Authentication
 Route::prefix('auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/profile', [AuthController::class, 'profile']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/profile', [AuthController::class, 'profile']);
+    });
 });
 
 // Products & Inventory
@@ -31,6 +34,7 @@ Route::prefix('products')->group(function () {
     Route::get('/alerts/low-stock', [ProductController::class, 'lowStock']);
     Route::get('/alerts/expiring', [ProductController::class, 'expiringSoon']);
     Route::get('/barcode/{barcode}', [ProductController::class, 'findByBarcode']);
+    Route::get('/{id}/image', [ProductController::class, 'image']);
     Route::get('/{id}', [ProductController::class, 'show']);
     Route::put('/{id}', [ProductController::class, 'update']);
     Route::delete('/{id}', [ProductController::class, 'destroy']);
@@ -81,4 +85,13 @@ Route::prefix('settings')->group(function () {
 // Payment & KHQR
 Route::prefix('payment')->group(function () {
     Route::post('/khqr/generate', [KhqrController::class, 'generate']);
+});
+
+// Users Management
+Route::middleware('auth:sanctum')->prefix('users')->group(function () {
+    Route::get('/', [UserController::class, 'index']);
+    Route::post('/', [UserController::class, 'store']);
+    Route::get('/{id}', [UserController::class, 'show']);
+    Route::put('/{id}', [UserController::class, 'update']);
+    Route::delete('/{id}', [UserController::class, 'destroy']);
 });

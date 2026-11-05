@@ -65,7 +65,7 @@ class DatabaseSeeder extends Seeder
                 ->first();
 
             if ($existing) {
-                $existing->update($userData);
+                $existing->update(array_diff_key($userData, ['password' => true]));
             } else {
                 User::create($userData);
             }

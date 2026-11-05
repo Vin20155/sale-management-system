@@ -128,7 +128,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 14,
                     offset: const Offset(0, 8),
                   ),
@@ -201,7 +201,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _selectedGender,
+                      initialValue: _selectedGender,
                       decoration: InputDecoration(
                         labelText: 'Gender',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -268,7 +268,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 14,
                       offset: const Offset(0, 8),
                     ),

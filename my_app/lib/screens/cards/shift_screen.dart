@@ -60,7 +60,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: hasOpenShift ? AppColors.success.withOpacity(0.12) : AppColors.danger.withOpacity(0.12),
+                            color: hasOpenShift ? AppColors.success.withValues(alpha: 0.12) : AppColors.danger.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(

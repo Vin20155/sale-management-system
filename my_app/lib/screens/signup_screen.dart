@@ -32,6 +32,9 @@ class _SignupScreenState extends State<SignupScreen> {
       // Send email verification
       await userCredential.user?.sendEmailVerification();
 
+      // Set Firebase User display name
+      await userCredential.user?.updateDisplayName(txtfulllname.text.trim());
+
       // Save user profile
       await FirebaseFirestore.instance
           .collection('users')
@@ -39,7 +42,10 @@ class _SignupScreenState extends State<SignupScreen> {
           .set({
             'user id': userCredential.user?.uid,
             'fulllname': txtfulllname.text.trim(),
+            'fullname': txtfulllname.text.trim(),
+            'name': txtfulllname.text.trim(),
             'email': txtemail.text.trim(),
+            'role': 'cashier',
             'is active': true,
             'created at': FieldValue.serverTimestamp(),
           });

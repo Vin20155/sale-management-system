@@ -308,7 +308,7 @@ class _SettingScreenState extends State<SettingScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.08) : Colors.transparent,
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.grey.shade300,
@@ -322,7 +322,7 @@ class _SettingScreenState extends State<SettingScreen> {
               height: 38,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary.withOpacity(0.15) : Colors.grey.shade100,
+                color: isSelected ? AppColors.primary.withValues(alpha: 0.15) : Colors.grey.shade100,
                 shape: BoxShape.circle,
               ),
               child: Text(
