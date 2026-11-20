@@ -94,4 +94,48 @@ class AuthController extends Controller
             'message' => 'ចាកចេញពីប្រព័ន្ធបានជោគជ័យ'
         ]);
     }
+
+    public function forgotPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|string',
+            'new_password' => 'required|string|min:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter a valid username/email and a password of at least 6 characters.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $login = trim($request->input('username'));
+        $user = User::where('username', $login)
+            ->orWhere('email', $login)
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Account not found for this username or email.',
+            ], 404);
+        }
+
+        if (!$user->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account has been deactivated.',
+            ], 403);
+        }
+
+        $user->password = Hash::make($request->input('new_password'));
+        $user->save();
+        $user->tokens()->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password has been reset successfully.',
+        ]);
+    }
 }

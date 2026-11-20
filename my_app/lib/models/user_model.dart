@@ -34,14 +34,4 @@ class UserModel {
       createdAt: json['created_at']?.toString() ?? '',
     );
   }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'email': email,
-        'role': role,
-        'phone': phone,
-        'is_active': isActive ? 1 : 0,
-        'created_at': createdAt,
-      };
 }

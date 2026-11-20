@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductBatch;
 use App\Models\Setting;
 use App\Models\Shift;
 use Illuminate\Http\Request;
@@ -86,8 +87,33 @@ class OrderController extends Controller
                 $lineSubtotalUsd = $unitPriceUsd * $qty;
                 $lineSubtotalKhr = $lineSubtotalUsd * $exchangeRate;
 
-                // Deduct stock
+                // Deduct stock from product table
                 $product->decrement('stock_quantity', $qty);
+
+                // FEFO: Deduct stock from product batches (earliest expiry first)
+                $batches = ProductBatch::where('product_id', $product->id)
+                    ->where('quantity_remaining', '>', 0)
+                    ->orderByRaw('CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END, expiry_date ASC, id ASC')
+                    ->lockForUpdate()
+                    ->get();
+
+                $needed = $qty;
+                foreach ($batches as $b) {
+                    if ($needed <= 0) break;
+                    $deduct = min($needed, $b->quantity_remaining);
+                    $b->decrement('quantity_remaining', $deduct);
+                    $needed -= $deduct;
+                }
+
+                // Update product table's primary expiry_date to match next available batch
+                $nextBatch = ProductBatch::where('product_id', $product->id)
+                    ->where('quantity_remaining', '>', 0)
+                    ->whereNotNull('expiry_date')
+                    ->orderBy('expiry_date', 'asc')
+                    ->first();
+                if ($nextBatch) {
+                    $product->update(['expiry_date' => $nextBatch->expiry_date]);
+                }
 
                 $subtotalUsd += $lineSubtotalUsd;
 
@@ -187,6 +213,52 @@ class OrderController extends Controller
                 'message' => 'ការលក់ទទួលបានជោគជ័យ!',
                 'data' => $order->load(['items', 'customer', 'cashier'])
             ], 201);
+        });
+    }
+
+    public function voidOrder($id)
+    {
+        $order = Order::with('items')->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'រកមិនឃើញវិក្កយបត្រ'
+            ], 404);
+        }
+
+        if ($order->status === 'voided') {
+            return response()->json([
+                'success' => false,
+                'message' => 'វិក្កយបត្រនេះត្រូវបានបោះបង់រួចហើយ'
+            ], 400);
+        }
+
+        return DB::transaction(function () use ($order) {
+            foreach ($order->items as $item) {
+                if ($item->product_id) {
+                    Product::where('id', $item->product_id)
+                        ->increment('stock_quantity', (int) $item->quantity);
+                }
+            }
+
+            if ($order->shift_id) {
+                $shift = Shift::find($order->shift_id);
+                if ($shift && $shift->status === 'open') {
+                    $shift->decrement('total_sales_usd', (float) $order->total_usd);
+                    $shift->decrement('total_sales_khr', (float) $order->total_khr);
+                    $shift->decrement('total_orders_count', 1);
+                }
+            }
+
+            $order->status = 'voided';
+            $order->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'បានបោះបង់វិក្កយបត្រ និងបង្វិលស្តុកទំនិញវិញរួចរាល់',
+                'data' => $order->load(['items', 'customer', 'cashier'])
+            ]);
         });
     }
 }

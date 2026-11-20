@@ -2,17 +2,12 @@ import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
-import 'package:my_app/app_auth.dart';
 import 'package:my_app/config/app_colors.dart';
 import 'package:my_app/config/app_language.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'package:my_app/screens/auth/app_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
   await AppLanguage.init();
 
   runApp(
@@ -24,21 +19,20 @@ void main() async {
   loadingConfig();
 }
 
-void loadingConfig(){
+void loadingConfig() {
   EasyLoading.instance
-  ..displayDuration = const Duration(milliseconds: 2000)
-  ..indicatorType = EasyLoadingIndicatorType.fadingCircle
-  ..loadingStyle = EasyLoadingStyle.dark
-  ..indicatorSize = 45.0
-  ..radius = 10.0
-  ..progressColor =AppColors.white
-  ..backgroundColor = Colors.green
-  ..indicatorColor = AppColors.white
-  ..textColor = AppColors.white
-  ..maskColor = AppColors.bgColor
-  ..userInteractions = true
-  ..dismissOnTap = false;
-  //..customAnimation = CustomAnimation();
+    ..displayDuration = const Duration(milliseconds: 2000)
+    ..indicatorType = EasyLoadingIndicatorType.fadingCircle
+    ..loadingStyle = EasyLoadingStyle.dark
+    ..indicatorSize = 45.0
+    ..radius = 10.0
+    ..progressColor = AppColors.white
+    ..backgroundColor = Colors.green
+    ..indicatorColor = AppColors.white
+    ..textColor = AppColors.white
+    ..maskColor = AppColors.primary
+    ..userInteractions = true
+    ..dismissOnTap = false;
 }
 
 class MyApp extends StatelessWidget {
@@ -52,7 +46,9 @@ class MyApp extends StatelessWidget {
         final bool isKh = currentLang == 'km';
         return MaterialApp(
           locale: Locale(currentLang),
-          title: isKh ? 'ប្រព័ន្ធគ្រប់គ្រងការលក់នៅម៉ាត' : 'Mart Sales Management System',
+          title: isKh
+              ? 'ប្រព័ន្ធគ្រប់គ្រងការលក់នៅម៉ាត'
+              : 'Mart Sales Management System',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(
@@ -72,7 +68,13 @@ class MyApp extends StatelessWidget {
               iconTheme: IconThemeData(color: Colors.white),
             ),
             useMaterial3: true,
-          ), 
+            fontFamilyFallback: const [
+              'KhmerOS',
+              'KhmerOSbattambang',
+              'LeelawUI',
+              'sans-serif',
+            ],
+          ),
           home: const AppAuth(),
           builder: EasyLoading.init(),
         );
@@ -80,9 +82,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-// widget
-// stateless widget
-// stateful widget
-
-  
-

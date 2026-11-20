@@ -1,6 +1,9 @@
+import 'product_batch_model.dart';
+
 class ProductModel {
   final int id;
   final String barcode;
+  final String itemCode;
   final String nameEn;
   final String nameKh;
   final int categoryId;
@@ -13,12 +16,15 @@ class ProductModel {
   int stockQuantity;
   final int reorderLevel;
   final String? expiryDate;
+  final String? receivedDate;
   final String? imageUrl;
   final bool isActive;
+  final List<ProductBatchModel> batches;
 
   ProductModel({
     required this.id,
     required this.barcode,
+    this.itemCode = '',
     required this.nameEn,
     required this.nameKh,
     required this.categoryId,
@@ -31,8 +37,10 @@ class ProductModel {
     required this.stockQuantity,
     this.reorderLevel = 10,
     this.expiryDate,
+    this.receivedDate,
     this.imageUrl,
     this.isActive = true,
+    this.batches = const [],
   });
 
   bool get isLowStock => stockQuantity <= reorderLevel;
@@ -48,12 +56,40 @@ class ProductModel {
     }
   }
 
+  String get formattedExpiryDate {
+    if (expiryDate == null || expiryDate!.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(expiryDate!);
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      // If contains 'T', take the first part
+      if (expiryDate!.contains('T')) {
+        return expiryDate!.split('T').first;
+      }
+      return expiryDate!;
+    }
+  }
+
+  String get formattedReceivedDate {
+    if (receivedDate == null || receivedDate!.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(receivedDate!);
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      if (receivedDate!.contains('T')) {
+        return receivedDate!.split('T').first;
+      }
+      return receivedDate!;
+    }
+  }
+
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     return ProductModel(
       id: json['id'] is int
           ? json['id']
           : int.tryParse(json['id'].toString()) ?? 0,
       barcode: json['barcode'] ?? '',
+      itemCode: json['item_code']?.toString() ?? '',
       nameEn: json['name_en'] ?? '',
       nameKh: json['name_kh'] ?? '',
       categoryId: json['category_id'] is int
@@ -72,14 +108,25 @@ class ProductModel {
           : int.tryParse(json['stock_quantity'].toString()) ?? 0,
       reorderLevel: json['reorder_level'] is int ? json['reorder_level'] : 10,
       expiryDate: json['expiry_date'],
+      receivedDate: json['received_date'],
       imageUrl: json['image_url'],
       isActive: json['is_active'] == 1 || json['is_active'] == true,
+      batches: json['active_batches'] is List
+          ? (json['active_batches'] as List)
+              .map((b) => ProductBatchModel.fromJson(b))
+              .toList()
+          : (json['batches'] is List
+              ? (json['batches'] as List)
+                  .map((b) => ProductBatchModel.fromJson(b))
+                  .toList()
+              : const []),
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'barcode': barcode,
+        'item_code': itemCode,
         'name_en': nameEn,
         'name_kh': nameKh,
         'category_id': categoryId,
@@ -91,6 +138,7 @@ class ProductModel {
         'stock_quantity': stockQuantity,
         'reorder_level': reorderLevel,
         'expiry_date': expiryDate,
+        'received_date': receivedDate,
         'image_url': imageUrl,
       };
 }

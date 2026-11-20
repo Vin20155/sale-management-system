@@ -30,11 +30,6 @@ class AppLanguage {
     } catch (_) {}
   }
 
-  /// Translate between Khmer and English directly
-  static String tr(String km, String en) {
-    return isKhmer ? km : en;
-  }
-
   /// Dynamic greeting based on time of day and selected language
   static String greeting() {
     int hour = DateTime.now().hour;

@@ -16,6 +16,11 @@ class Category extends Model
         'icon',
         'color_hex',
         'description',
+        'units',
+    ];
+
+    protected $casts = [
+        'units' => 'array',
     ];
 
     public function products()

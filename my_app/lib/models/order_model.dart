@@ -21,27 +21,20 @@ class OrderItemModel {
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     return OrderItemModel(
-      productId: json['product_id'] ?? 0,
-      productName: json['product_name'] ?? '',
-      barcode: json['barcode'],
-      unitPriceUsd: (json['unit_price_usd'] ?? 0).toDouble(),
-      unitPriceKhr: (json['unit_price_khr'] ?? 0).toDouble(),
-      quantity: json['quantity'] ?? 1,
-      subtotalUsd: (json['subtotal_usd'] ?? 0).toDouble(),
-      subtotalKhr: (json['subtotal_khr'] ?? 0).toDouble(),
+      productId: int.tryParse(json['product_id']?.toString() ?? '0') ?? 0,
+      productName: json['product_name']?.toString() ?? '',
+      barcode: json['barcode']?.toString(),
+      unitPriceUsd:
+          double.tryParse(json['unit_price_usd']?.toString() ?? '0') ?? 0.0,
+      unitPriceKhr:
+          double.tryParse(json['unit_price_khr']?.toString() ?? '0') ?? 0.0,
+      quantity: int.tryParse(json['quantity']?.toString() ?? '1') ?? 1,
+      subtotalUsd:
+          double.tryParse(json['subtotal_usd']?.toString() ?? '0') ?? 0.0,
+      subtotalKhr:
+          double.tryParse(json['subtotal_khr']?.toString() ?? '0') ?? 0.0,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-        'product_id': productId,
-        'product_name': productName,
-        'barcode': barcode,
-        'unit_price_usd': unitPriceUsd,
-        'unit_price_khr': unitPriceKhr,
-        'quantity': quantity,
-        'subtotal_usd': subtotalUsd,
-        'subtotal_khr': subtotalKhr,
-      };
 }
 
 class OrderModel {
@@ -59,7 +52,7 @@ class OrderModel {
   final double changeUsd;
   final double changeKhr;
   final int pointsEarned;
-  final String status;
+  String status;
   final String createdAt;
   final String? cashierName;
   final String? customerName;
@@ -87,35 +80,52 @@ class OrderModel {
     required this.items,
   });
 
+  bool get isVoided => status.toLowerCase() == 'voided';
+  bool get isKhqr => paymentMethod == 'khqr_bakong';
+
   factory OrderModel.fromJson(Map<String, dynamic> json) {
-    var rawItems = json['items'] as List? ?? [];
-    List<OrderItemModel> itemsList =
-        rawItems.map((e) => OrderItemModel.fromJson(e)).toList();
+    final rawItems = json['items'] as List? ?? [];
+    final cashierObj = json['cashier'] as Map<String, dynamic>?;
+    final customerObj = json['customer'] as Map<String, dynamic>?;
+    String rawDate = json['created_at']?.toString() ?? '';
+    if (rawDate.length >= 19) {
+      rawDate = rawDate.substring(0, 19).replaceAll('T', ' ');
+    }
 
     return OrderModel(
-      id: json['id'] is int
-          ? json['id']
-          : int.tryParse(json['id'].toString()) ?? 0,
-      invoiceNo: json['invoice_no'] ?? '',
-      subtotalUsd: (json['subtotal_usd'] ?? 0).toDouble(),
-      discountUsd: (json['discount_usd'] ?? 0).toDouble(),
-      taxUsd: (json['tax_usd'] ?? 0).toDouble(),
-      totalUsd: (json['total_usd'] ?? 0).toDouble(),
-      totalKhr: (json['total_khr'] ?? 0).toDouble(),
-      exchangeRate: (json['exchange_rate'] ?? 4100.0).toDouble(),
-      paymentMethod: json['payment_method'] ?? 'cash_usd',
-      receivedUsd: (json['received_usd'] ?? 0).toDouble(),
-      receivedKhr: (json['received_khr'] ?? 0).toDouble(),
-      changeUsd: (json['change_usd'] ?? 0).toDouble(),
-      changeKhr: (json['change_khr'] ?? 0).toDouble(),
-      pointsEarned: json['points_earned'] ?? 0,
-      status: json['status'] ?? 'completed',
-      createdAt: json['created_at'] ?? '',
-      cashierName: json['cashier'] != null
-          ? json['cashier']['name_kh'] ?? json['cashier']['name']
-          : 'បេឡាករ',
-      customerName: json['customer'] != null ? json['customer']['name'] : null,
-      items: itemsList,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      invoiceNo: json['invoice_no']?.toString() ?? '',
+      subtotalUsd:
+          double.tryParse(json['subtotal_usd']?.toString() ?? '0') ?? 0.0,
+      discountUsd:
+          double.tryParse(json['discount_usd']?.toString() ?? '0') ?? 0.0,
+      taxUsd: double.tryParse(json['tax_usd']?.toString() ?? '0') ?? 0.0,
+      totalUsd: double.tryParse(json['total_usd']?.toString() ?? '0') ?? 0.0,
+      totalKhr: double.tryParse(json['total_khr']?.toString() ?? '0') ?? 0.0,
+      exchangeRate:
+          double.tryParse(json['exchange_rate']?.toString() ?? '4100') ??
+              4100.0,
+      paymentMethod: json['payment_method']?.toString() ?? 'cash_usd',
+      receivedUsd:
+          double.tryParse(json['received_usd']?.toString() ?? '0') ?? 0.0,
+      receivedKhr:
+          double.tryParse(json['received_khr']?.toString() ?? '0') ?? 0.0,
+      changeUsd: double.tryParse(json['change_usd']?.toString() ?? '0') ?? 0.0,
+      changeKhr: double.tryParse(json['change_khr']?.toString() ?? '0') ?? 0.0,
+      pointsEarned: int.tryParse(json['points_earned']?.toString() ?? '0') ?? 0,
+      status: json['status']?.toString() ?? 'completed',
+      createdAt: rawDate,
+      cashierName: cashierObj?['name']?.toString() ??
+          json['cashier_name']?.toString() ??
+          'បេឡាករ',
+      customerName: customerObj != null
+          ? '${customerObj['name'] ?? ''} (${customerObj['phone'] ?? ''})'
+              .trim()
+          : json['customer_name']?.toString(),
+      items: rawItems
+          .whereType<Map<String, dynamic>>()
+          .map(OrderItemModel.fromJson)
+          .toList(),
     );
   }
 }

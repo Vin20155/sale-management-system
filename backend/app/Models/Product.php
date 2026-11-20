@@ -11,6 +11,7 @@ class Product extends Model
 
     protected $fillable = [
         'barcode',
+        'item_code',
         'name_en',
         'name_kh',
         'category_id',
@@ -22,6 +23,7 @@ class Product extends Model
         'stock_quantity',
         'reorder_level',
         'expiry_date',
+        'received_date',
         'image_url',
         'is_active',
     ];
@@ -35,11 +37,24 @@ class Product extends Model
         'reorder_level' => 'integer',
         'is_active' => 'boolean',
         'expiry_date' => 'date',
+        'received_date' => 'date',
     ];
 
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function batches()
+    {
+        return $this->hasMany(ProductBatch::class);
+    }
+
+    public function activeBatches()
+    {
+        return $this->hasMany(ProductBatch::class)
+            ->where('quantity_remaining', '>', 0)
+            ->orderByRaw('CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END, expiry_date ASC, id ASC');
     }
 
     public function orderItems()

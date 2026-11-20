@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/config/app_colors.dart';
-import 'package:my_app/services/mart_service.dart';
+import 'package:my_app/config/app_url.dart';
 
 class ProductImage extends StatelessWidget {
-  final int? productId;
   final String? imageUrl;
   final double width;
   final double height;
@@ -12,7 +11,6 @@ class ProductImage extends StatelessWidget {
 
   const ProductImage({
     super.key,
-    this.productId,
     required this.imageUrl,
     required this.width,
     required this.height,
@@ -20,12 +18,23 @@ class ProductImage extends StatelessWidget {
     this.placeholderIcon = Icons.fastfood_outlined,
   });
 
+  String _resolveImageUrl(String? rawUrl) {
+    final value = rawUrl?.trim();
+    if (value == null || value.isEmpty) {
+      return '${AppUrl.imageUrl}products/default.jpg';
+    }
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    final cleanPath = value
+        .replaceFirst(RegExp(r'^/+'), '')
+        .replaceFirst(RegExp(r'^storage/+'), '');
+    return '${AppUrl.imageUrl}$cleanPath';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final resolvedUrl = MartService().resolveProductImageUrl(
-      imageUrl,
-      productId: productId,
-    );
+    final resolvedUrl = _resolveImageUrl(imageUrl);
     final placeholder = Container(
       width: width,
       height: height,
@@ -36,17 +45,15 @@ class ProductImage extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: borderRadius,
-      child: resolvedUrl == null
-          ? placeholder
-          : Image.network(
-              resolvedUrl,
-              width: width,
-              height: height,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) =>
-                  progress == null ? child : placeholder,
-              errorBuilder: (context, error, stackTrace) => placeholder,
-            ),
+      child: Image.network(
+        resolvedUrl,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : placeholder,
+        errorBuilder: (context, error, stackTrace) => placeholder,
+      ),
     );
   }
 }

@@ -14,17 +14,16 @@ part 'customer_service.dart';
 part 'settings_service.dart';
 part 'report_service.dart';
 part 'user_service.dart';
-part 'mart_seed_data.dart';
 
 class MartService {
   static final MartService _instance = MartService._internal();
   factory MartService() => _instance;
-  MartService._internal() {
-    _initLocalData();
-  }
+  MartService._internal();
 
-  // Android emulators use the host's 10.0.2.2 alias; desktop uses localhost.
-  String _baseUrl = AppUrl.defaultApiBaseUrl;
+  static const String _apiBaseUrlKey = 'API_BASE_URL';
+  static const String _authTokenKey = 'AUTH_TOKEN';
+
+  String _baseUrl = '${AppUrl.baseUrl}api';
   bool _isOnline = false;
 
   String get baseUrl => _baseUrl;
@@ -36,51 +35,16 @@ class MartService {
     productsRevision.value++;
   }
 
-  String? resolveProductImageUrl(String? imageUrl, {int? productId}) {
-    final value = imageUrl?.trim();
-
-    if (value != null && value.isNotEmpty) {
-      final normalizedUrl = value.toLowerCase();
-      if (normalizedUrl.startsWith('http://') ||
-          normalizedUrl.startsWith('https://')) {
-        return value;
-      }
-    }
-
-    final apiUri = Uri.parse(_baseUrl);
-    if (productId != null) {
-      final apiPath = apiUri.path.replaceFirst(RegExp(r'/+$'), '');
-      return apiUri
-          .replace(
-            path: '$apiPath/products/$productId/image',
-            queryParameters:
-                value == null || value.isEmpty ? null : {'v': value},
-            fragment: null,
-          )
-          .toString();
-    }
-
-    if (value == null || value.isEmpty) return null;
-
-    final path = value.startsWith('/')
-        ? value
-        : '/storage/${value.startsWith('storage/') ? value.substring(8) : value}';
-    return apiUri.replace(path: path, query: null, fragment: null).toString();
-  }
-
   // Local fallback storage
   List<CategoryModel> _categories = [];
   List<ProductModel> _products = [];
-  List<OrderModel> _orders = [];
-  List<CustomerModel> _customers = [];
+  final List<OrderModel> _orders = [];
+  final List<CustomerModel> _customers = [];
   List<UserModel> _users = [];
   ShiftModel? _currentShift;
   MartSettingModel _settings = MartSettingModel();
 
-  List<CategoryModel> get categories => _categories;
   List<ProductModel> get products => _products;
-  List<OrderModel> get orders => _orders;
-  List<CustomerModel> get customers => _customers;
   List<UserModel> get users => _users;
 
   // Exchange rate
@@ -136,7 +100,7 @@ class MartService {
         return 'The server returned an invalid login response.';
       }
 
-      await sp.setString(AppUrl.authTokenPreferenceKey, token);
+      await sp.setString(_authTokenKey, token);
       await _saveAuthenticatedUser(sp, user);
       return null;
     } catch (e) {
@@ -145,10 +109,42 @@ class MartService {
     }
   }
 
-  Future<bool> restoreSession() async {
+  Future<String?> resetPassword({
+    required String username,
+    required String newPassword,
+  }) async {
     try {
       final sp = await SharedPreferences.getInstance();
-      final token = sp.getString(AppUrl.authTokenPreferenceKey);
+      _baseUrl = await _loadBaseUrl(sp);
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/auth/forgot-password'),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'username': username.trim(),
+              'new_password': newPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+      final body = jsonDecode(response.body);
+      if (response.statusCode != 200 || body['success'] != true) {
+        return body['message']?.toString() ?? 'Failed to reset password.';
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Reset password request failed: $e');
+      return 'Unable to connect to the server. Check your connection and try again.';
+    }
+  }
+
+  Future<bool> restoreSession() async {
+    SharedPreferences? sp;
+    try {
+      sp = await SharedPreferences.getInstance();
+      final token = sp.getString(_authTokenKey);
       if (token == null || token.isEmpty) return false;
 
       _baseUrl = await _loadBaseUrl(sp);
@@ -158,10 +154,15 @@ class MartService {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 4));
+
       if (response.statusCode != 200) {
-        await _clearAuthSession(sp);
-        return false;
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          await _clearAuthSession(sp);
+          return false;
+        }
+        final hasCachedUser = sp.getString('FULLNAME')?.isNotEmpty == true;
+        return hasCachedUser;
       }
 
       final body = jsonDecode(response.body);
@@ -175,13 +176,22 @@ class MartService {
       return true;
     } catch (e) {
       debugPrint('Session restore failed: $e');
+      if (sp != null) {
+        final hasCachedUser = sp.getString('FULLNAME')?.isNotEmpty == true ||
+            sp.getString('ROLE')?.isNotEmpty == true;
+        if (hasCachedUser) {
+          debugPrint(
+              'Server offline or timed out - continuing with cached local session.');
+          return true;
+        }
+      }
       return false;
     }
   }
 
   Future<void> logout() async {
     final sp = await SharedPreferences.getInstance();
-    final token = sp.getString(AppUrl.authTokenPreferenceKey);
+    final token = sp.getString(_authTokenKey);
     try {
       if (token != null && token.isNotEmpty) {
         await http.post(
@@ -201,7 +211,7 @@ class MartService {
 
   Future<Map<String, String>> get userAuthHeaders async {
     final sp = await SharedPreferences.getInstance();
-    final token = sp.getString(AppUrl.authTokenPreferenceKey);
+    final token = sp.getString(_authTokenKey);
     return {
       'Accept': 'application/json',
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
@@ -219,7 +229,7 @@ class MartService {
   }
 
   Future<void> _clearAuthSession(SharedPreferences preferences) async {
-    await preferences.remove(AppUrl.authTokenPreferenceKey);
+    await preferences.remove(_authTokenKey);
     await preferences.remove('FULLNAME');
     await preferences.remove('EMAIL');
     await preferences.remove('ROLE');
@@ -227,25 +237,16 @@ class MartService {
   }
 
   Future<String> _loadBaseUrl(SharedPreferences preferences) async {
-    final savedUrl = preferences.getString(AppUrl.apiBaseUrlPreferenceKey);
-    if (AppUrl.isDesktop &&
-        savedUrl?.replaceFirst(RegExp(r'/+$'), '') ==
-            AppUrl.androidEmulatorApiBaseUrl) {
-      await preferences.setString(
-        AppUrl.apiBaseUrlPreferenceKey,
-        AppUrl.defaultApiBaseUrl,
-      );
-      return AppUrl.defaultApiBaseUrl;
-    }
+    final savedUrl = preferences.getString(_apiBaseUrlKey);
     return savedUrl == null || savedUrl.isEmpty
-        ? AppUrl.defaultApiBaseUrl
+        ? '${AppUrl.baseUrl}api'
         : savedUrl;
   }
 
   Future<void> setBaseUrl(String url) async {
     _baseUrl = url;
     final sp = await SharedPreferences.getInstance();
-    await sp.setString(AppUrl.apiBaseUrlPreferenceKey, url);
+    await sp.setString(_apiBaseUrlKey, url);
     await testConnection();
     if (_isOnline) {
       await getCategories();
@@ -284,7 +285,4 @@ class MartService {
     String formatted = str.replaceAllMapped(reg, (Match m) => '${m[1]},');
     return '$formatted ៛';
   }
-
-  double usdToKhr(double usd) => usd * _settings.exchangeRate;
-  double khrToUsd(double khr) => khr / _settings.exchangeRate;
 }

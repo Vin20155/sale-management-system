@@ -46,7 +46,8 @@ extension ProductService on MartService {
           .where((p) =>
               p.nameKh.toLowerCase().contains(s) ||
               p.nameEn.toLowerCase().contains(s) ||
-              p.barcode.toLowerCase().contains(s))
+              p.barcode.toLowerCase().contains(s) ||
+              p.itemCode.toLowerCase().contains(s))
           .toList();
     }
     return result;
@@ -74,6 +75,7 @@ extension ProductService on MartService {
     final productWithCat = ProductModel(
       id: product.id,
       barcode: product.barcode,
+      itemCode: product.itemCode,
       nameEn: product.nameEn,
       nameKh: product.nameKh,
       categoryId: product.categoryId,
@@ -86,8 +88,10 @@ extension ProductService on MartService {
       stockQuantity: product.stockQuantity,
       reorderLevel: product.reorderLevel,
       expiryDate: product.expiryDate,
+      receivedDate: product.receivedDate,
       imageUrl: product.imageUrl,
       isActive: product.isActive,
+      batches: product.batches,
     );
 
     if (image != null) {
@@ -149,6 +153,7 @@ extension ProductService on MartService {
     final productWithCat = ProductModel(
       id: product.id,
       barcode: product.barcode,
+      itemCode: product.itemCode,
       nameEn: product.nameEn,
       nameKh: product.nameKh,
       categoryId: product.categoryId,
@@ -161,8 +166,10 @@ extension ProductService on MartService {
       stockQuantity: product.stockQuantity,
       reorderLevel: product.reorderLevel,
       expiryDate: product.expiryDate,
+      receivedDate: product.receivedDate,
       imageUrl: product.imageUrl,
       isActive: product.isActive,
+      batches: product.batches,
     );
 
     if (image != null || removeImage) {
@@ -293,5 +300,142 @@ extension ProductService on MartService {
 
   List<ProductModel> getExpiringProducts() {
     return _products.where((p) => p.isExpiringSoon && p.isActive).toList();
+  }
+
+  // ==========================================
+  // PRODUCT BATCHES / STOCK IN
+  // ==========================================
+  Future<List<ProductBatchModel>> getProductBatches(int productId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$_baseUrl/products/$productId/batches'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        final json = jsonDecode(res.body);
+        if (json['success'] == true) {
+          return (json['data'] as List)
+              .map((b) => ProductBatchModel.fromJson(b))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('getProductBatches error: $e');
+    }
+
+    final p = _products.firstWhere((prod) => prod.id == productId,
+        orElse: () => _products.first);
+    return p.batches;
+  }
+
+  Future<bool> addStockBatch({
+    required int productId,
+    required int quantity,
+    required String receivedDate,
+    String? expiryDate,
+    String? batchNo,
+    double? costPriceUsd,
+    String? supplierName,
+    String? note,
+  }) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$_baseUrl/products/$productId/batches'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'quantity': quantity,
+              'received_date': receivedDate,
+              'expiry_date': expiryDate,
+              'batch_no': batchNo,
+              'cost_price_usd': costPriceUsd,
+              'supplier_name': supplierName,
+              'note': note,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final json = jsonDecode(res.body);
+        if (json['success'] == true) {
+          // Update product in local memory
+          if (json['data'] != null && json['data']['product'] != null) {
+            final updated = ProductModel.fromJson(json['data']['product']);
+            final idx = _products.indexWhere((p) => p.id == productId);
+            if (idx != -1) {
+              _products[idx] = updated;
+            }
+            _notifyProductsChanged();
+          }
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('addStockBatch HTTP error: $e');
+    }
+
+    // Offline fallback: Update product stock and local batches list
+    final idx = _products.indexWhere((p) => p.id == productId);
+    if (idx != -1) {
+      final p = _products[idx];
+      final newBatch = ProductBatchModel(
+        id: DateTime.now().millisecondsSinceEpoch,
+        productId: productId,
+        batchNo: batchNo ?? 'B-${DateTime.now().millisecondsSinceEpoch}',
+        receivedDate: receivedDate,
+        expiryDate: expiryDate,
+        quantityReceived: quantity,
+        quantityRemaining: quantity,
+        costPriceUsd: costPriceUsd ?? p.costPriceUsd,
+        costPriceKhr: (costPriceUsd ?? p.costPriceUsd) * exchangeRate,
+        supplierName: supplierName,
+        note: note,
+      );
+
+      final updatedBatches = List<ProductBatchModel>.from(p.batches)
+        ..add(newBatch);
+      // Sort FEFO
+      updatedBatches.sort((a, b) {
+        if (a.expiryDate == null) return 1;
+        if (b.expiryDate == null) return -1;
+        return a.expiryDate!.compareTo(b.expiryDate!);
+      });
+
+      // Update nearest expiry date
+      final nearest = updatedBatches.firstWhere(
+        (b) => b.quantityRemaining > 0 && b.expiryDate != null,
+        orElse: () => updatedBatches.first,
+      );
+
+      _products[idx] = ProductModel(
+        id: p.id,
+        barcode: p.barcode,
+        itemCode: p.itemCode,
+        nameEn: p.nameEn,
+        nameKh: p.nameKh,
+        categoryId: p.categoryId,
+        categoryName: p.categoryName,
+        unit: p.unit,
+        costPriceUsd: costPriceUsd ?? p.costPriceUsd,
+        costPriceKhr: (costPriceUsd ?? p.costPriceUsd) * exchangeRate,
+        sellingPriceUsd: p.sellingPriceUsd,
+        sellingPriceKhr: p.sellingPriceKhr,
+        stockQuantity: p.stockQuantity + quantity,
+        reorderLevel: p.reorderLevel,
+        expiryDate: nearest.expiryDate ?? p.expiryDate,
+        receivedDate: p.receivedDate,
+        imageUrl: p.imageUrl,
+        isActive: p.isActive,
+        batches: updatedBatches,
+      );
+      _notifyProductsChanged();
+      return true;
+    }
+
+    return false;
   }
 }

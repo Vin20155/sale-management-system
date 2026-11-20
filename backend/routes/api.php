@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\UserController;
 // Authentication
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:10,1');
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/profile', [AuthController::class, 'profile']);
@@ -34,10 +35,13 @@ Route::prefix('products')->group(function () {
     Route::get('/alerts/low-stock', [ProductController::class, 'lowStock']);
     Route::get('/alerts/expiring', [ProductController::class, 'expiringSoon']);
     Route::get('/barcode/{barcode}', [ProductController::class, 'findByBarcode']);
-    Route::get('/{id}/image', [ProductController::class, 'image']);
     Route::get('/{id}', [ProductController::class, 'show']);
     Route::put('/{id}', [ProductController::class, 'update']);
     Route::delete('/{id}', [ProductController::class, 'destroy']);
+    
+    // Product Batches (Stock In & Expiry tracking)
+    Route::get('/{id}/batches', [ProductController::class, 'getBatches']);
+    Route::post('/{id}/batches', [ProductController::class, 'addBatch']);
 });
 
 // Categories
@@ -54,6 +58,7 @@ Route::prefix('orders')->group(function () {
     Route::get('/', [OrderController::class, 'index']);
     Route::post('/', [OrderController::class, 'store']);
     Route::get('/{id}', [OrderController::class, 'show']);
+    Route::post('/{id}/void', [OrderController::class, 'voidOrder']);
 });
 
 // Customers & Loyalty

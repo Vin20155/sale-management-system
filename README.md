@@ -21,26 +21,16 @@ sale-management-system/
 │
 └── my_app/                        # Flutter Application (Android, iOS, Web, Windows)
     ├── lib/
-    │   ├── config/
-    │   │   └── app_colors.dart    # Theme ពណ៌ម៉ាតបែបទំនើប (Emerald & Navy & Gold)
-    │   ├── models/
-    │   │   └── mart_models.dart   # Product, Cart, Order, Shift, Category, Customer Models
-    │   ├── services/
-    │   │   └── mart_service.dart  # Laravel REST API Client + Offline Local Fallback Mode
+    │   ├── config/                # App Colors, Language, and API URL Config
+    │   ├── models/                # Category, Product, Order, Shift, Customer, Setting, User Models
+    │   ├── services/              # Laravel REST API Client + Local Offline Cache
     │   ├── screens/
-    │   │   ├── main_screen.dart   # ផ្ទាំងគ្រប់គ្រងធំ (Mart Dashboard)
-    │   │   └── cards/
-    │   │       ├── pos_screen.dart       # កន្លែងគិតលុយរហ័ស (POS, Barcode, Cart, Pay)
-    │   │       ├── product_screen.dart   # គ្រប់គ្រងទំនិញ (Products, Barcode, Add/Edit)
-    │   │       ├── category_screen.dart  # ប្រភេទទំនិញម៉ាត (Categories)
-    │   │       ├── stock_screen.dart     # ស្តុក & ទំនិញជិតផុតកំណត់ (Stock & Expiry)
-    │   │       ├── invoice_screen.dart   # ប្រវត្តិវិក្កយបត្រ (Sales Invoices & Receipt)
-    │   │       ├── shift_screen.dart     # វេនការងារ & ប្រអប់លុយបេឡាករ (Shift Drawer)
-    │   │       ├── customer_screen.dart  # អតិថិជន & ពិន្ទុសន្សំ (Customer Loyalty)
-    │   │       ├── report_screen.dart    # របាយការណ៍លក់ប្រចាំថ្ងៃ (Daily Analytics)
-    │   │       └── setting_screen.dart   # កំណត់អត្រាប្តូរប្រាក់ & ភ្ជាប់ Backend API
-    │   ├── menu/
-    │   │   └── navigation_menu.dart # ម៉ឺនុយចំហៀង (Mart Navigation Drawer)
+    │   │   ├── auth/              # Session Gate (app_auth.dart) & Login Screen
+    │   │   ├── dashboard/         # Main Dashboard Screen (main_screen.dart)
+    │   │   ├── pos/               # POS Terminal, Shift Drawer, Invoices, Customer Loyalty
+    │   │   ├── inventory/         # Products, Categories, Stock & Expiry Tracking
+    │   │   └── admin/             # Reports, User Management, Mart Settings
+    │   ├── widgets/               # Navigation Drawer, Role Switcher, Product Image
     │   └── main.dart
     └── pubspec.yaml
 ```
